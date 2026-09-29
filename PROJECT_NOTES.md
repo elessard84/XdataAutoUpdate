@@ -251,13 +251,22 @@ Voir `AGENTS.md`. En résumé :
 
 ## 10. État Git
 
-- Branche : `master`.
-- Dernier commit : `887d495 Add project sources, notes, README, gitignore`
-  (7 fichiers, 935 insertions, 3 suppressions).
-- Fichiers suivis ajoutés : `.gitignore`, `README.md`, `PROJECT_NOTES.md`,
+- Branche : `master`, à jour avec `origin/master`.
+- Dernier commit : `0e4921f Add COM-based part renaming (manual + auto) and
+  user docs`.
+- Historique récent (4 commits) :
+
+```text
+0e4921f  Add COM-based part renaming (manual + auto) and user docs
+0ec8e55  Document current git state and extensibility cadrage
+887d495  Add project sources, notes, README, gitignore
+e5bee27  Add agents.md
+```
+
+- Working tree : propre.
+- Fichiers suivis notables : `.gitignore`, `AGENTS.md`, `README.md`,
+  `QUICK_GUIDE.md`, `PROJECT_NOTES.md`, `EXTENSIBILITY_NOTES.md`,
   `XdataAutoUpdate.csproj`, `PressureNetworkXdataCommand.cs`,
-  `AutoUpdateReactor.cs` ; `AGENTS.md` mis à jour.
-- `.gitignore` présent : `bin/`, `obj/`, `.config/`, IDE et divers ignorés.
-- Non commité à ce stade : mise à jour de cette section et
-  `EXTENSIBILITY_NOTES.md` (en attente de validation).
-- Aucun push effectué ; pas de push sans accord explicite.
+  `RenameCommand.cs`, `AutoUpdateReactor.cs`.
+- Ignorés via `.gitignore` : `bin/`, `obj/`, `.vs/`, `.config/`.
+- Distant : GitHub `https://github.com/elessard84/XdataAutoUpdate.git`.
