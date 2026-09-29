@@ -224,13 +224,13 @@ Voir `AGENTS.md`. En résumé :
 
 ## 10. État Git
 
-- Branche : `master`, à jour avec `origin/master`.
-- Dernier commit : `e5bee27 Add agents.md`.
-- Modifié non commité : `AGENTS.md`.
-- Nouveaux fichiers (untracked, à committer) : `.gitignore`, `README.md`,
-  `PROJECT_NOTES.md`, `XdataAutoUpdate.csproj`,
-  `PressureNetworkXdataCommand.cs`, `AutoUpdateReactor.cs`.
-- `.gitignore` présent : `bin/`, `obj/`, `.config/`, IDE et divers sont
-  désormais ignorés.
-- Commit prévu : `Add project sources, notes, gitignore` (après validation).
-- Aucun push sans accord explicite.
+- Branche : `master`.
+- Dernier commit : `887d495 Add project sources, notes, README, gitignore`
+  (7 fichiers, 935 insertions, 3 suppressions).
+- Fichiers suivis ajoutés : `.gitignore`, `README.md`, `PROJECT_NOTES.md`,
+  `XdataAutoUpdate.csproj`, `PressureNetworkXdataCommand.cs`,
+  `AutoUpdateReactor.cs` ; `AGENTS.md` mis à jour.
+- `.gitignore` présent : `bin/`, `obj/`, `.config/`, IDE et divers ignorés.
+- Non commité à ce stade : mise à jour de cette section et
+  `EXTENSIBILITY_NOTES.md` (en attente de validation).
+- Aucun push effectué ; pas de push sans accord explicite.
