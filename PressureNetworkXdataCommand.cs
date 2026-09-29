@@ -14,16 +14,13 @@ namespace XdataAutoUpdate
 
         public static int WriteAll(Database db, CivilDocument civilDoc)
         {
-            int count = 0;
-
             using (Transaction tr = db.TransactionManager.StartTransaction())
             {
                 try
                 {
-                    EnsureRegApp(tr, db);
-                    count += WritePressureNetworks(tr, civilDoc);
-                    count += WritePipeNetworks(tr, civilDoc);
+                    int count = WriteAllInTransaction(tr, db, civilDoc);
                     tr.Commit();
+                    return count;
                 }
                 catch
                 {
@@ -31,7 +28,16 @@ namespace XdataAutoUpdate
                     throw;
                 }
             }
+        }
 
+        public static int WriteAllInTransaction(
+            Transaction tr, Database db, CivilDocument civilDoc)
+        {
+            EnsureRegApp(tr, db);
+
+            int count = 0;
+            count += WritePressureNetworks(tr, civilDoc);
+            count += WritePipeNetworks(tr, civilDoc);
             return count;
         }
 

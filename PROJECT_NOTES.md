@@ -59,12 +59,13 @@ Fichiers générés (non versionnés) : `bin/`, `obj/`.
 
 ## 4. Les deux DLL
 
-Un seul `.csproj`, deux configurations :
+Un seul `.csproj`, **3 configurations** (`Debug`, `Release`, `Auto`) produisant
+**2 DLL** :
 
 | DLL | Configuration | Constante | Assembly | Rôle |
 |---|---|---|---|---|
-| **A** | `Release` (ou `Debug`) | `MANUAL` | `XdataAutoUpdate.dll` | Commande manuelle `C3D_PN_XDATA` |
-| **B** | `Auto` | `AUTO` | `XdataAutoUpdateAuto.dll` | Auto-update sur `Database.BeginSave` |
+| **A** | `Release` (ou `Debug`) | `MANUAL` | `XdataAutoUpdate.dll` | Commandes manuelles `C3D_PN_XDATA`, `C3D_PN_RENAME` |
+| **B** | `Auto` | `AUTO` | `XdataAutoUpdateAuto.dll` | Auto-update (XData + rename) sur `Database.BeginSave` |
 
 Le csproj définit :
 
@@ -94,11 +95,12 @@ dotnet build -c Auto -p:Platform=x64
 
 ### Commandes exposées
 
-- DLL A : `C3D_PN_XDATA`
+- DLL A : `C3D_PN_XDATA`, `C3D_PN_RENAME`
 - DLL B : `C3D_PN_XDATA_AUTO` (exécution manuelle immédiate),
   `C3D_PN_XDATA_AUTO_ON`, `C3D_PN_XDATA_AUTO_OFF`
 
-Aucun conflit si les deux DLL sont NETLOADées.
+Aucun conflit si les deux DLL sont NETLOADées. `XdataWriter` et
+`CivilPartRenamer` sont partagés (compilés dans A et B).
 
 ## 5. Architecture du code
 
@@ -106,9 +108,11 @@ Aucun conflit si les deux DLL sont NETLOADées.
 
 - `internal static class XdataWriter` — **logique partagée par les deux DLL** :
   - `RegAppName = "CIVIL3D_PN_NAME"`
-  - `int WriteAll(Database db, CivilDocument civilDoc)` : une transaction ;
-    `EnsureRegApp` puis `WritePressureNetworks` puis `WritePipeNetworks` ;
-    `Commit`, sinon `Abort` + rethrow.
+  - `int WriteAll(Database db, CivilDocument civilDoc)` : transaction propre ;
+    délègue à `WriteAllInTransaction`, puis `Commit`, sinon `Abort` + rethrow.
+  - `int WriteAllInTransaction(Transaction tr, Database db, CivilDocument civilDoc)` :
+    variante transaction-aware (`EnsureRegApp` → pressure → pipe), réutilisée par
+    la DLL B. Même sémantique que `WriteAll`.
   - `int WritePressureNetworks(...)` : `civilDoc.GetPressurePipeNetworkIds()`
     → par réseau `GetPipeIds()` / `GetFittingIds()` / `GetAppurtenanceIds()`,
     nom lu via `PressurePart.NetworkName`.
@@ -126,6 +130,24 @@ Aucun conflit si les deux DLL sont NETLOADées.
 - `#if MANUAL` : `public class PressureNetworkXdataCommand`
   avec `[CommandMethod("C3D_PN_XDATA")]`.
 
+### `RenameCommand.cs`
+
+- `public static class CivilPartRenamer` — **partagée par les deux DLL** :
+  - `RenamePressureParts(Transaction, CivilDocument)` :
+    `GetPressurePipeNetworkIds()` → `GetPipeIds()` (CON) + `GetFittingIds()`
+    (RAC) ; nom via `PressurePart.NetworkName`.
+  - `RenamePipeParts(Transaction, CivilDocument)` : `GetPipeNetworkIds()` →
+    `GetPipeIds()` (CON) ; nom via `Network.Name`. Structures ignorées.
+  - Pour chaque part : `Handle.ToString()` →
+    `newName = "<réseau>-<CON|RAC>-<handle>"` → écriture COM
+    `dynamic comPart = part.AcadObject; comPart.Name = newName;`.
+  - Compteurs statiques par type (`PressurePipeRenamed` / `...Failed`, etc.)
+    + `Errors`. Ne commit pas (transaction gérée par l'appelant) ; ne touche
+    pas XData.
+- `#if MANUAL` : `public class RenameCommand` avec
+  `[CommandMethod("C3D_PN_RENAME")]`, rapport `PressurePipe / PressureFitting /
+  Pipe` + max 10 messages d'erreur.
+
 ### `AutoUpdateReactor.cs` (`#if AUTO`)
 
 - `public class AutoUpdateReactor` :
@@ -136,8 +158,10 @@ Aucun conflit si les deux DLL sont NETLOADées.
   - `DisableInternal()` : désabonne `DocumentActivated`, détache BeginSave,
     `_enabled = false`.
   - `OnBeginSave(object, DatabaseIOEventArgs)` : garde de réentrance
-    `_running`, vérifie que la base sauvée est celle du document actif,
-    appelle `XdataWriter.WriteAll`, erreurs écrites dans l'éditeur.
+    `_running`, vérifie que la base sauvée est celle du document actif, puis
+    ouvre **une** transaction : `XdataWriter.WriteAllInTransaction` +
+    `CivilPartRenamer.RenamePressureParts` + `RenamePipeParts`, `Commit`, et log
+    (XData écrites / parts renommées / échecs). Erreurs dans l'éditeur.
   - `OnDocumentActivated` : migre l'attache vers la base du nouveau document.
   - Commandes `C3D_PN_XDATA_AUTO`, `_ON`, `_OFF`.
 - `public class AutoUpdateExtension : IExtensionApplication` :
@@ -176,28 +200,31 @@ Aucun conflit si les deux DLL sont NETLOADées.
 | `DBObject.XData` | `ResultBuffer` (get/set) |
 | `RegAppTable.Has(string)` / `.Add(RegAppTableRecord)` | vérifiés |
 | `DxfCode.ExtendedDataRegAppName` (1001) / `ExtendedDataAsciiString` (1000) | cast `(short)` |
+| `DBObject.AcadObject` | `public System.Object AcadObject { get; }` (réflexion) |
+| `DBObject.Handle` | `Autodesk.AutoCAD.DatabaseServices.Handle`, get public, lecture seule |
+| Écriture COM `.Name` via `dynamic` | VERIFIED runtime (Pipe, PressurePipe, PressureFitting) |
 
 Fondation AutoCAD fiable (AGENTS.md) : `Application.DocumentManager.MdiActiveDocument`,
 `Document.Database`, `Document.Editor`, `Transaction` / `StartTransaction` /
 `GetObject` / `Commit` / `Abort`, `ObjectIdCollection`, `DBObject`, etc.
 
-## 7. Points à valider au runtime (NON testés)
+## 7. Validation runtime
 
-Le build et la structure sont validés statiquement ; le comportement en session
-Civil 3D 2026 reste à confirmer :
+**VALIDÉ** (test runtime rename COM, cas A1–A4 et B1–B4) :
 
-1. **`BeginSave` depuis plugin NETLOADé** : confirmer que l'événement se
-   déclenche et que les XData écrites sont bien incluses dans le DWG sauvé.
-2. **Écriture DB pendant `BeginSave`** : ajout de `RegAppTableRecord` et
-   assignation XData pendant l'événement. Si `eLockViolation` : le RegApp est
-   déjà pré-enregistré par `EnableInternal`, donc normalement sans écriture new.
-3. **NETLOAD de la DLL B sans commande** : doit activer l'auto-update dès le
-   premier SAVE (extension `IExtensionApplication`). Vérifier aussi au démarrage
-   à froid avec `DocumentActivated`.
-4. **Base non active sauvée** : le handler ignore volontairement une base qui
-   n'est pas celle du `MdiActiveDocument` (pas de mapping fiable vers un
-   `CivilDocument`). À valider selon les scénarios WBLOCK / SAVEAS.
-5. **Persistance du RegApp** : `CIVIL3D_PN_NAME` présent dans le DWG après save.
+- écriture COM `.Name` sur `Pipe`, `PressurePipe`, `PressureFitting` ;
+- persistance après SAVE + fermeture + réouverture ;
+- undo (`U`) restaure le nom ;
+- `Database.BeginSave` se déclenche depuis la DLL B NETLOADée ;
+- écriture DB (XData + rename) pendant `BeginSave` ;
+- `C3D_PN_XDATA_AUTO` (XData + rename) — OK.
+
+### Reste à confirmer
+
+- **Base non active sauvée** : le handler ignore volontairement une base qui
+  n'est pas celle du `MdiActiveDocument` (scénarios WBLOCK / SAVEAS).
+- **Persistance du RegApp** : `CIVIL3D_PN_NAME` présent dans le DWG après save.
+- **Auto-activation à froid** : premier `DocumentActivated` sans document ouvert.
 
 ## 8. Test d'acceptation manuel
 

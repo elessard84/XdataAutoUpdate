@@ -197,7 +197,40 @@ namespace XdataAutoUpdate
             _running = true;
             try
             {
-                XdataWriter.WriteAll(db, civilDoc);
+                CivilPartRenamer.Reset();
+
+                int xdataCount = 0;
+                int renamed = 0;
+                int renameFailed = 0;
+
+                using (Transaction tr = db.TransactionManager.StartTransaction())
+                {
+                    try
+                    {
+                        xdataCount = XdataWriter.WriteAllInTransaction(tr, db, civilDoc);
+
+                        CivilPartRenamer.RenamePressureParts(tr, civilDoc);
+                        CivilPartRenamer.RenamePipeParts(tr, civilDoc);
+
+                        renamed = CivilPartRenamer.PressurePipeRenamed
+                            + CivilPartRenamer.PressureFittingRenamed
+                            + CivilPartRenamer.PipeRenamed;
+                        renameFailed = CivilPartRenamer.PressurePipeFailed
+                            + CivilPartRenamer.PressureFittingFailed
+                            + CivilPartRenamer.PipeFailed;
+
+                        tr.Commit();
+                    }
+                    catch
+                    {
+                        tr.Abort();
+                        throw;
+                    }
+                }
+
+                doc.Editor.WriteMessage(
+                    "\nC3D_PN_XDATA_AUTO: {0} XData ecrites, {1} parts renommees, {2} echecs.",
+                    xdataCount, renamed, renameFailed);
             }
             catch (System.Exception ex)
             {
