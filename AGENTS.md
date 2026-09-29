@@ -564,9 +564,58 @@ Before finishing a Civil 3D coding task, check:
 - Did I inspect `git diff`?
 - Did I avoid destructive Git operations?
 
----
 
-## Core Principle
+# Local RAG / API Documentation Rule
+
+Local Civil 3D 2026 API documentation is available at:
+
+`D:\RAG\Civil3D_API_2026\civapidocs_named\`
+
+Original GUID-named source files are available at:
+
+`D:\RAG\Civil3D_API_2026\civapidocs.com\`
+
+These directories are outside the repository.
+
+## When to use the local RAG
+
+If an `IMPLEMENTATION_BRIEF.md` or `API_CONTRACT.md` exists in the repository:
+
+1. Read it first.
+2. Treat its VERIFIED API contract as the implementation specification.
+3. Do not unnecessarily re-research every already verified API.
+4. If an Autodesk API required by the implementation is missing, ambiguous, or contradicted by a compiler error, search the local RAG before guessing or using model memory.
+5. If the brief marks an API as UNVERIFIED, search the local RAG before attempting that implementation path.
+
+If no implementation brief/API contract exists, verify all required Civil 3D-specific APIs against the local RAG before implementation.
+
+## Mandatory fallback rule
+
+For any uncertain Civil 3D API:
+
+`IMPLEMENTATION_BRIEF/API_CONTRACT`
+→ `local RAG`
+→ `official Autodesk documentation if still unresolved`
+→ `UNVERIFIED`
+
+Never:
+
+`uncertain API`
+→ `model memory`
+→ `plausible code`
+
+## Efficient RAG search
+
+Do not dump complete HTML documentation pages into context unless absolutely necessary.
+
+Prefer targeted searches such as:
+
+```powershell
+Get-ChildItem "D:\RAG\Civil3D_API_2026\civapidocs_named" `
+  -Filter "*PressurePipeNetwork*GetPipeIds*" `
+  -File 
+  
+### Core Principle
 
 For Autodesk development:
 
